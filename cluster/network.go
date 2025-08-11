@@ -402,7 +402,7 @@ var EtcdClientPortList = []string{
 }
 
 var CalicoNetworkLabels = []string{CalicoNodeLabel, CalicoControllerLabel}
-var IPv6CompatibleNetworkPlugins = []string{CalicoNetworkPlugin, AciNetworkPlugin}
+var IPv6CompatibleNetworkPlugins = []string{NoNetworkPlugin, CalicoNetworkPlugin, CanalNetworkPlugin, AciNetworkPlugin}
 
 func (c *Cluster) deployNetworkPlugin(ctx context.Context, data map[string]interface{}) error {
 	log.Infof(ctx, "[network] Setting up network plugin: %s", c.Network.Plugin)
@@ -815,7 +815,7 @@ func (c *Cluster) checkKubeAPIPort(ctx context.Context) error {
 	log.Infof(ctx, "[network] Checking KubeAPI port Control Plane hosts")
 	for _, host := range c.ControlPlaneHosts {
 		logrus.Debugf("[network] Checking KubeAPI port [%s] on host: %s", KubeAPIPort, host.Address)
-		address := fmt.Sprintf("%s:%s", host.Address, KubeAPIPort)
+		address := net.JoinHostPort(host.Address, KubeAPIPort)
 		conn, err := net.Dial("tcp", address)
 		if err != nil {
 			return fmt.Errorf("[network] Can't access KubeAPI port [%s] on Control Plane host: %s", KubeAPIPort, host.Address)
@@ -1064,7 +1064,7 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 func getPortBindings(hostAddress string, portList []string) []nat.PortBinding {
 	portBindingList := []nat.PortBinding{}
 	for _, portNumber := range portList {
-		rawPort := fmt.Sprintf("%s:%s:1337/tcp", hostAddress, portNumber)
+		rawPort := fmt.Sprintf("%s:1337/tcp", portNumber)
 		portMapping, _ := nat.ParsePortSpec(rawPort)
 		portBindingList = append(portBindingList, portMapping[0].Binding)
 	}

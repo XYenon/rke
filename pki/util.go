@@ -255,8 +255,10 @@ func GetCrtNameForHost(host *hosts.Host, prefix string) string {
 	var newAddress string
 	if len(host.InternalAddress) != 0 && host.InternalAddress != host.Address {
 		newAddress = strings.Replace(host.InternalAddress, ".", "-", -1)
+		newAddress = strings.Replace(newAddress, ":", "-", -1)
 	} else {
 		newAddress = strings.Replace(host.Address, ".", "-", -1)
+		newAddress = strings.Replace(newAddress, ":", "-", -1)
 	}
 	return prefix + "-" + strings.ToLower(newAddress)
 }
@@ -746,7 +748,7 @@ func ValidateBundleContent(rkeConfig *v3.RancherKubernetesEngineConfig, certBund
 	if len(cpHosts) > 0 {
 		kubeAdminCertObj := certBundle[KubeAdminCertName]
 		kubeAdminConfig := GetKubeConfigX509WithData(
-			"https://"+cpHosts[0].Address+":6443",
+			"https://"+net.JoinHostPort(cpHosts[0].Address, "6443"),
 			rkeConfig.ClusterName,
 			KubeAdminCertName,
 			string(cert.EncodeCertPEM(certBundle[CACertName].Certificate)),

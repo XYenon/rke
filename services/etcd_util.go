@@ -35,7 +35,7 @@ func getEtcdClientV2(ctx context.Context, etcdHost *hosts.Host, localConnDialerF
 	}
 
 	cfg := etcdclientv2.Config{
-		Endpoints: []string{"https://" + etcdHost.InternalAddress + ":2379"},
+		Endpoints: []string{"https://" + net.JoinHostPort(etcdHost.InternalAddress, "2379")},
 		Transport: defaultEtcdTransport,
 	}
 
@@ -131,7 +131,7 @@ func getHealthEtcd(hc http.Client, host *hosts.Host, url string) (string, error)
 func GetEtcdInitialCluster(hosts []*hosts.Host) string {
 	initialCluster := ""
 	for i, host := range hosts {
-		initialCluster += fmt.Sprintf("etcd-%s=https://%s:2380", host.HostnameOverride, host.InternalAddress)
+		initialCluster += fmt.Sprintf("etcd-%s=https://%s", host.HostnameOverride, net.JoinHostPort(host.InternalAddress, "2380"))
 		if i < (len(hosts) - 1) {
 			initialCluster += ","
 		}
@@ -158,10 +158,10 @@ func GetEtcdConnString(hosts []*hosts.Host, hostAddress string) string {
 			containsHostAddress = true
 			continue
 		}
-		connHosts = append(connHosts, "https://"+host.InternalAddress+":2379")
+		connHosts = append(connHosts, "https://"+net.JoinHostPort(host.InternalAddress, "2379"))
 	}
 	if containsHostAddress {
-		connHosts = append([]string{"https://" + hostAddress + ":2379"}, connHosts...)
+		connHosts = append([]string{"https://" + net.JoinHostPort(hostAddress, "2379")}, connHosts...)
 	}
 	return strings.Join(connHosts, ",")
 }

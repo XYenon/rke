@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"path"
 	"strings"
 	"time"
@@ -182,7 +183,7 @@ func memberAdd(ctx context.Context, etcdClient *etcdclientv3.Client, peerURL str
 func AddEtcdMember(ctx context.Context, toAddEtcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory,
 	k8sVersion string, cert, key []byte) error {
 	log.Infof(ctx, "[add/%s] Adding member [etcd-%s] to etcd cluster", ETCDRole, toAddEtcdHost.HostnameOverride)
-	peerURL := fmt.Sprintf("https://%s:2380", toAddEtcdHost.InternalAddress)
+	peerURL := fmt.Sprintf("https://%s", net.JoinHostPort(toAddEtcdHost.InternalAddress, "2380"))
 	added := false
 	for _, host := range etcdHosts {
 		if host.Address == toAddEtcdHost.Address {
@@ -367,7 +368,7 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHos
 func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.Host, localConnDialerFactory hosts.DialerFactory,
 	k8sVersion string, cert, key []byte) (bool, error) {
 	var listErr error
-	peerURL := fmt.Sprintf("https://%s:2380", etcdHost.InternalAddress)
+	peerURL := fmt.Sprintf("https://%s", net.JoinHostPort(etcdHost.InternalAddress, "2380"))
 	for _, host := range etcdHosts {
 		if host.Address == etcdHost.Address {
 			continue
@@ -436,7 +437,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),
 			"--key", pki.GetKeyPath(pki.KubeNodeCertName),
 			"--name", name,
-			"--endpoints=" + etcdHost.InternalAddress + ":2379",
+			"--endpoints=" + net.JoinHostPort(etcdHost.InternalAddress, "2379"),
 		},
 		Image: etcdSnapshotImage,
 		Env:   es.ExtraEnv,
@@ -688,7 +689,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 			"sh", "-c", strings.Join([]string{
 				"rm -rf", EtcdRestorePath,
 				"&& /usr/local/bin/etcdctl",
-				fmt.Sprintf("--endpoints=[%s:2379]", etcdHost.InternalAddress),
+				fmt.Sprintf("--endpoints=[%s]", net.JoinHostPort(etcdHost.InternalAddress, "2379")),
 				"--cacert", pki.GetCertPath(pki.CACertName),
 				"--cert", pki.GetCertPath(nodeName),
 				"--key", pki.GetKeyPath(nodeName),
@@ -697,7 +698,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 				"--name=etcd-" + etcdHost.HostnameOverride,
 				"--initial-cluster=" + initCluster,
 				"--initial-cluster-token=etcd-cluster-1",
-				"--initial-advertise-peer-urls=https://" + etcdHost.InternalAddress + ":2380",
+				"--initial-advertise-peer-urls=https://" + net.JoinHostPort(etcdHost.InternalAddress, "2380"),
 				"&& mv", EtcdRestorePath + "*", EtcdDataDir,
 				"&& rm -rf", EtcdRestorePath,
 			}, " "),
