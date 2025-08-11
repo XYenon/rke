@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -160,9 +162,9 @@ func GetProcessConfig(process v3.Process, host *hosts.Host, k8sVersion string) (
 
 func GetHealthCheckURL(useTLS bool, port int) string {
 	if useTLS {
-		return fmt.Sprintf("%s%s:%d%s", HTTPSProtoPrefix, HealthzAddress, port, HealthzEndpoint)
+		return fmt.Sprintf("%s%s%s", HTTPSProtoPrefix, net.JoinHostPort(HealthzAddress, strconv.Itoa(port)), HealthzEndpoint)
 	}
-	return fmt.Sprintf("%s%s:%d%s", HTTPProtoPrefix, HealthzAddress, port, HealthzEndpoint)
+	return fmt.Sprintf("%s%s%s", HTTPProtoPrefix, net.JoinHostPort(HealthzAddress, strconv.Itoa(port)), HealthzEndpoint)
 }
 
 func createLogLink(ctx context.Context, host *hosts.Host, containerName, plane, image string, prsMap map[string]v3.PrivateRegistry) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"net"
 	"reflect"
 	"sort"
 	"strings"
@@ -259,7 +260,7 @@ func GenerateKubeAdminCertificate(ctx context.Context, certs map[string]Certific
 	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, kubeAdminCrt, kubeAdminKey, nil)
 	if len(cpHosts) > 0 {
 		kubeAdminConfig := GetKubeConfigX509WithData(
-			"https://"+cpHosts[0].Address+":6443",
+			"https://"+net.JoinHostPort(cpHosts[0].Address, "6443"),
 			rkeConfig.ClusterName,
 			KubeAdminCertName,
 			string(cert.EncodeCertPEM(caCrt)),

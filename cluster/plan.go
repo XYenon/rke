@@ -820,7 +820,11 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host) v3.Process {
 	Command := c.getNginxEntryPoint(host.OS())
 	nginxProxyEnv := ""
 	for i, host := range c.ControlPlaneHosts {
-		nginxProxyEnv += fmt.Sprintf("%s", host.InternalAddress)
+		if strings.Contains(host.InternalAddress, ":") {
+			nginxProxyEnv += fmt.Sprintf("[%s]", host.InternalAddress)
+		} else {
+			nginxProxyEnv += host.InternalAddress
+		}
 		if i < (len(c.ControlPlaneHosts) - 1) {
 			nginxProxyEnv += ","
 		}
@@ -1046,9 +1050,9 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 	CommandArgs := map[string]string{
 		"name":                        "etcd-" + host.HostnameOverride,
 		"data-dir":                    services.EtcdDataDir,
-		"listen-client-urls":          "https://" + listenAddress + ":2379",
-		"initial-advertise-peer-urls": "https://" + host.InternalAddress + ":2380",
-		"listen-peer-urls":            "https://" + listenAddress + ":2380",
+		"listen-client-urls":          "https://" + net.JoinHostPort(listenAddress, "2379"),
+		"initial-advertise-peer-urls": "https://" + net.JoinHostPort(host.InternalAddress, "2380"),
+		"listen-peer-urls":            "https://" + net.JoinHostPort(listenAddress, "2380"),
 		"initial-cluster-token":       "etcd-cluster-1",
 		"initial-cluster":             initCluster,
 		"initial-cluster-state":       clusterState,
@@ -1081,10 +1085,10 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 	// We removed advertising port 4001 starting with k8s 1.19 (etcd v3.4.13 and up)
 	if etcdSemVer.LessThan(*maxEtcdPort4001Version) {
 		logrus.Debugf("etcd version [%s] is less than max version [%s] for advertising port 4001, going to advertise port 4001", etcdSemVer, maxEtcdPort4001Version)
-		CommandArgs["advertise-client-urls"] = "https://" + host.InternalAddress + ":2379,https://" + host.InternalAddress + ":4001"
+		CommandArgs["advertise-client-urls"] = "https://" + net.JoinHostPort(host.InternalAddress, "2379") + ",https://" + net.JoinHostPort(host.InternalAddress, "4001")
 	} else {
 		logrus.Debugf("etcd version [%s] is higher than max version [%s] for advertising port 4001, not going to advertise port 4001", etcdSemVer, maxEtcdPort4001Version)
-		CommandArgs["advertise-client-urls"] = "https://" + host.InternalAddress + ":2379"
+		CommandArgs["advertise-client-urls"] = "https://" + net.JoinHostPort(host.InternalAddress, "2379")
 	}
 
 	// Add in stricter TLS ciphter suites starting with etcd v3.4.15
@@ -1143,7 +1147,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 
 	Binds = append(Binds, c.Services.Etcd.ExtraBinds...)
 	healthCheck := v3.HealthCheck{
-		URL: fmt.Sprintf("https://%s:2379/health", host.InternalAddress),
+		URL: fmt.Sprintf("https://%s/health", net.JoinHostPort(host.InternalAddress, "2379")),
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Etcd.Image, c.PrivateRegistriesMap)
 
@@ -1163,7 +1167,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 	// Apply old configuration to avoid replacing etcd container
 	if etcdSemVer.LessThan(*maxEtcdOldEnvSemVer) {
 		logrus.Debugf("Version [%s] is less than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
-		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s:2379", listenAddress))
+		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s", net.JoinHostPort(listenAddress, "2379")))
 	} else {
 		logrus.Debugf("Version [%s] is equal or higher than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
 		// Point etcdctl to localhost in case we have listen all (0.0.0.0) configured
@@ -1171,7 +1175,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 			Env = append(Env, "ETCDCTL_ENDPOINTS=https://127.0.0.1:2379")
 			// If internal address is configured, set endpoint to that address as well
 		} else {
-			Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINTS=https://%s:2379", listenAddress))
+			Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINTS=https://%s", net.JoinHostPort(listenAddress, "2379")))
 		}
 	}
 

@@ -862,7 +862,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 			newConfig = getLocalAdminConfigWithNewAddress(kubeCluster.LocalKubeConfigPath, cpHost.Address, kubeCluster.ClusterName)
 		} else {
 			log.Debugf(ctx, "[reconcile] Rebuilding and updating local kube config, creating new kubeconfig")
-			kubeURL := fmt.Sprintf("https://%s:6443", cpHost.Address)
+			kubeURL := fmt.Sprintf("https://%s", net.JoinHostPort(cpHost.Address, "6443"))
 			caData := string(cert.EncodeCertPEM(caCrt))
 			crtData := string(cert.EncodeCertPEM(currentKubeConfig.Certificate))
 			keyData := string(cert.EncodePrivateKeyPEM(currentKubeConfig.Key))
@@ -902,9 +902,9 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string, cluste
 	if config == nil || config.BearerToken != "" {
 		return ""
 	}
-	config.Host = fmt.Sprintf("https://%s:6443", cpAddress)
+	config.Host = fmt.Sprintf("https://%s", net.JoinHostPort(cpAddress, "6443"))
 	return pki.GetKubeConfigX509WithData(
-		"https://"+cpAddress+":6443",
+		"https://"+net.JoinHostPort(cpAddress, "6443"),
 		clusterName,
 		pki.KubeAdminCertName,
 		string(config.CAData),

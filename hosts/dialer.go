@@ -50,7 +50,7 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 	var bastionDialer *dialer
 	if len(h.BastionHost.Address) > 0 {
 		bastionDialer = &dialer{
-			sshAddress:      fmt.Sprintf("%s:%s", h.BastionHost.Address, h.BastionHost.Port),
+			sshAddress:      net.JoinHostPort(h.BastionHost.Address, h.BastionHost.Port),
 			username:        h.BastionHost.User,
 			sshKeyString:    h.BastionHost.SSHKey,
 			sshCertString:   h.BastionHost.SSHCert,
@@ -74,7 +74,7 @@ func newDialer(h *Host, kind string) (*dialer, error) {
 	}
 
 	dialer := &dialer{
-		sshAddress:      fmt.Sprintf("%s:%s", h.Address, h.Port),
+		sshAddress:      net.JoinHostPort(h.Address, h.Port),
 		username:        h.User,
 		dockerSocket:    h.DockerSocket,
 		sshKeyString:    h.SSHKey,
@@ -225,7 +225,7 @@ func (d *dialer) getBastionHostTunnelConn() (*ssh.Client, error) {
 func BastionHostWrapTransport(bastionHost v3.BastionHost) (transport.WrapperFunc, error) {
 
 	bastionDialer := &dialer{
-		sshAddress:      fmt.Sprintf("%s:%s", bastionHost.Address, bastionHost.Port),
+		sshAddress:      net.JoinHostPort(bastionHost.Address, bastionHost.Port),
 		username:        bastionHost.User,
 		sshKeyString:    bastionHost.SSHKey,
 		sshCertString:   bastionHost.SSHCert,
