@@ -84,6 +84,7 @@ func TestPKI(t *testing.T) {
 	// Test ALT IPs
 	kubeAPIAltIPs := []net.IP{
 		net.ParseIP("127.0.0.1"),
+		net.ParseIP("::1"),
 		net.ParseIP(rkeConfig.Nodes[0].InternalAddress),
 		net.ParseIP(rkeConfig.Nodes[0].Address),
 	}

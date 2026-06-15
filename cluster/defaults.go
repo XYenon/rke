@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/blang/semver"
@@ -219,6 +220,21 @@ func setDefaultIfEmpty(varName *string, defaultValue string) {
 	}
 }
 
+// addressToHostnameOverride converts a node address into a DNS1123-compatible hostname.
+// IPv6 addresses have ':' and '::' replaced with '-' so they pass hostname validation.
+func addressToHostnameOverride(address string) string {
+	if ip := net.ParseIP(address); ip != nil && ip.To4() == nil {
+		result := strings.Replace(address, "::", "-", -1)
+		result = strings.Replace(result, ":", "-", -1)
+		result = strings.Trim(result, "-")
+		if result == "" {
+			return "node"
+		}
+		return result
+	}
+	return address
+}
+
 func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) error {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
@@ -243,8 +259,7 @@ func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) e
 			c.Nodes[i].InternalAddress = c.Nodes[i].Address
 		}
 		if len(host.HostnameOverride) == 0 {
-			// This is a temporary modification
-			c.Nodes[i].HostnameOverride = c.Nodes[i].Address
+			c.Nodes[i].HostnameOverride = addressToHostnameOverride(c.Nodes[i].Address)
 		}
 		if len(host.SSHKeyPath) == 0 {
 			c.Nodes[i].SSHKeyPath = c.SSHKeyPath

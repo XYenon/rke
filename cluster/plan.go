@@ -1041,11 +1041,8 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 		"/usr/local/bin/etcd",
 	}
 
-	// If InternalAddress is not explicitly set, it's set to the same value as Address. This is all good until we deploy on a host with a DNATed public address like AWS, in that case we can't bind to that address so we fall back to 0.0.0.0
-	listenAddress := host.InternalAddress
-	if host.Address == host.InternalAddress {
-		listenAddress = "0.0.0.0"
-	}
+	// If InternalAddress is not explicitly set, it's set to the same value as Address. This is all good until we deploy on a host with a DNATed public address like AWS, in that case we can't bind to that address so we fall back to all interfaces.
+	listenAddress := getEtcdListenAddress(host)
 
 	CommandArgs := map[string]string{
 		"name":                        "etcd-" + host.HostnameOverride,
@@ -1165,18 +1162,13 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, se
 	Env = append(Env, fmt.Sprintf("ETCDCTL_KEY=%s", pki.GetKeyPath(nodeName)))
 
 	// Apply old configuration to avoid replacing etcd container
+	etcdctlEndpoint := getEtcdctlLocalEndpoint(listenAddress)
 	if etcdSemVer.LessThan(*maxEtcdOldEnvSemVer) {
 		logrus.Debugf("Version [%s] is less than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
-		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s", net.JoinHostPort(listenAddress, "2379")))
+		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s", etcdctlEndpoint))
 	} else {
 		logrus.Debugf("Version [%s] is equal or higher than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
-		// Point etcdctl to localhost in case we have listen all (0.0.0.0) configured
-		if listenAddress == "0.0.0.0" {
-			Env = append(Env, "ETCDCTL_ENDPOINTS=https://127.0.0.1:2379")
-			// If internal address is configured, set endpoint to that address as well
-		} else {
-			Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINTS=https://%s", net.JoinHostPort(listenAddress, "2379")))
-		}
+		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINTS=https://%s", etcdctlEndpoint))
 	}
 
 	if architecture == "aarch64" {
@@ -1361,4 +1353,34 @@ func getCloudProviderName(name string) string {
 		return "external"
 	}
 	return name
+}
+
+const (
+	etcdListenAllIPv4 = "0.0.0.0"
+	etcdListenAllIPv6 = "::"
+)
+
+// getEtcdListenAddress returns the address etcd should bind to.
+// When address equals internal_address, bind to all interfaces instead of the
+// node IP so DNAT/public-IP setups keep working. IPv6 nodes use ::, IPv4 use 0.0.0.0.
+func getEtcdListenAddress(host *hosts.Host) string {
+	if host.Address != host.InternalAddress {
+		return host.InternalAddress
+	}
+	if ip := net.ParseIP(host.InternalAddress); ip != nil && ip.To4() == nil {
+		return etcdListenAllIPv6
+	}
+	return etcdListenAllIPv4
+}
+
+// getEtcdctlLocalEndpoint returns the local etcdctl endpoint for the given listen address.
+func getEtcdctlLocalEndpoint(listenAddress string) string {
+	switch listenAddress {
+	case etcdListenAllIPv4:
+		return net.JoinHostPort("127.0.0.1", "2379")
+	case etcdListenAllIPv6:
+		return net.JoinHostPort("::1", "2379")
+	default:
+		return net.JoinHostPort(listenAddress, "2379")
+	}
 }
